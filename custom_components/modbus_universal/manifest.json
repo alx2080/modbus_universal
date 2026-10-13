@@ -1,0 +1,23 @@
+{
+  "domain": "modbus_universal",
+  "name": "Modbus Universal",
+  "codeowners": [
+    "@alx2080"
+  ],
+  "config_flow": true,
+  "dependencies": [
+    "modbus"
+  ],
+  "documentation": "https://github.com/alx2080/modbus_universal",
+  "integration_type": "device",
+  "iot_class": "local_polling",
+  "issue_tracker": "https://github.com/alx2080/modbus_universal/issues",
+  "loggers": [
+    "modbus_connection",
+    "tmodbus"
+  ],
+  "requirements": [
+    "modbus-connection[tmodbus]>=4.12.4"
+  ],
+  "version": "0.1.1"
+}
