@@ -94,3 +94,10 @@ NUMERIC_DATA_TYPES: Final = (
     DT_FLOAT64,
 )
 INTEGER_16_DATA_TYPES: Final = (DT_UINT16, DT_INT16)
+
+# --- Bit group: one register (16/32/64 bits) shown as a binary sensor per bit
+PLATFORM_BIT_GROUP: Final = "bit_group"
+CONF_BITS: Final = "bits"
+CONF_BIT_NAMES: Final = "bit_names"
+BIT_GROUP_DATA_TYPES: Final = (DT_UINT16, DT_UINT32, DT_UINT64)
+BIT_GROUP_WIDTH: Final = {DT_UINT16: 16, DT_UINT32: 32, DT_UINT64: 64}

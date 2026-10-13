@@ -141,6 +141,7 @@
           "menu_options": {
             "sensor": "Sensor (read a value)",
             "binary_sensor": "Binary sensor (on/off state)",
+            "bit_group": "Bit group (WORD/DWORD → a binary sensor per bit)",
             "switch": "Switch (write on/off)",
             "number": "Number (write a value, e.g. a setpoint)",
             "select": "Select (register value ↔ named mode)"
@@ -259,6 +260,36 @@
         "test_result": {
           "title": "Test read",
           "description": "**{name}** currently reads: **{value}**\n\nSubmit to save the register, or close this dialog and add it again with other settings."
+        },
+        "bit_group": {
+          "title": "Bit group",
+          "description": "{error}",
+          "data": {
+            "name": "Group name",
+            "register_type": "Register type",
+            "address": "Address",
+            "data_type": "Register size",
+            "word_order": "Word order",
+            "byte_swap": "Swap bytes inside each register",
+            "bits": "Bits",
+            "bit_names": "Bit names",
+            "invert": "Invert all bits",
+            "device_class": "Device class",
+            "fast_poll": "Fast polling",
+            "test_read": "Read the register before saving"
+          },
+          "data_description": {
+            "data_type": "uint16 — 16 bits (1 register), uint32 — 32 bits (DWORD, 2 registers), uint64 — 64 bits (4 registers). Read in one request.",
+            "word_order": "For 32/64 bits: big — high word at the lower address (ABCD), little — the other way round (CDAB). Switch it if bits 0–15 and 16–31 come out swapped.",
+            "bits": "Which bits to create, e.g. 0-7, 12, 15. Empty — every bit of the register.",
+            "bit_names": "One per line in bit order, or numbered: 5=Pump fault. An empty line skips a bit. A bit without a name is called by the group name and its number, e.g. \"Status 7\". Use | to set the class and inversion of a single bit: 3=Door | door | inv.",
+            "fast_poll": "Poll this register at the device's fast interval instead of the normal one.",
+            "device_class": "For every bit of the group; a single bit can have its own in the names, after |."
+          }
+        },
+        "bit_test_result": {
+          "title": "Test read",
+          "description": "**{name}** now:\n\n{value}\n\nSubmit to save the group, or close this dialog and add it again with other settings."
         }
       },
       "error": {
@@ -269,7 +300,9 @@
         "invalid_scale": "Scale cannot be 0.",
         "invalid_register": "This combination of settings is not possible.",
         "not_loaded": "The device is not running, so the register cannot be test-read. Save without the test or fix the connection first.",
-        "read_failed": "Reading failed: {error}"
+        "read_failed": "Reading failed: {error}",
+        "invalid_bits": "Invalid bit list or names: a bit outside the register, a typo in \"0-7, 12\", or more names than bits.",
+        "invalid_bit_class": "Unknown device class in the bit names. Valid ones include: problem, door, window, running, power, safety, moisture, smoke, lock, opening, motion."
       },
       "abort": {
         "reconfigure_successful": "Register updated."

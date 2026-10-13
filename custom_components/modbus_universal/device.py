@@ -9,6 +9,7 @@ from __future__ import annotations
 from collections.abc import Mapping
 from dataclasses import dataclass, field
 import logging
+import re
 from typing import Any
 
 from modbus_connection import ModbusExceptionError, ModbusUnit
@@ -47,6 +48,10 @@ from .const import (
     REG_DISCRETE,
     REG_HOLDING,
     REG_INPUT,
+    BIT_GROUP_WIDTH,
+    CONF_BIT_NAMES,
+    CONF_BITS,
+    PLATFORM_BIT_GROUP,
 )
 
 _LOGGER = logging.getLogger(__name__)
@@ -100,6 +105,100 @@ class _ByteSwappedStringField(StringField):
         return _swap_bytes(super().encode(value, scale_exponent))
 
 
+_NAMED_LINE = re.compile(r"^\s*(\d+)\s*[=:]\s*(.*?)\s*$")
+
+
+def bit_group_width(point: Mapping[str, Any]) -> int:
+    """How many bits the register of a bit group has (16, 32 or 64)."""
+    return BIT_GROUP_WIDTH.get(point.get(CONF_DATA_TYPE, DT_UINT16), 16)
+
+
+def parse_bits(text: str | None, width: int) -> list[int]:
+    """Parse '0-7, 12, 15' into a sorted list of bit numbers; empty = all bits.
+
+    Raises ``ValueError`` for bad syntax or a bit outside the register.
+    """
+    text = (text or "").strip()
+    if not text:
+        return list(range(width))
+    bits: set[int] = set()
+    for part in re.split(r"[,;\s]+", text):
+        if not part:
+            continue
+        lo, sep, hi = part.partition("-")
+        start = int(lo)
+        end = int(hi) if sep else start
+        if start > end:
+            start, end = end, start
+        if start < 0 or end >= width:
+            raise ValueError(f"bit {end if end >= width else start} is outside 0-{width - 1}")
+        bits.update(range(start, end + 1))
+    return sorted(bits)
+
+
+def parse_bit_names(text: str | None, bits: list[int]) -> dict[int, str]:
+    """Names for the bits of a group.
+
+    Each line is either 'N=Name' (or 'N: Name') for bit N, or just a name,
+    which goes to the next selected bit after the previous line's bit. Empty
+    lines skip a bit, so a plain list can follow the register map line by line.
+
+    Raises ``ValueError`` for a name of a bit that is not in the group.
+    """
+    names: dict[int, str] = {}
+    if not (text or "").strip():
+        return names
+    position = 0  # index into bits for the next unnumbered line
+    for line in (text or "").splitlines():
+        if match := _NAMED_LINE.match(line):
+            bit = int(match.group(1))
+            if bit not in bits:
+                raise ValueError(f"bit {bit} is not in the group")
+            if match.group(2):
+                names[bit] = match.group(2)
+            position = bits.index(bit) + 1
+            continue
+        if position >= len(bits):
+            if line.strip():
+                raise ValueError("more names than bits")
+            continue
+        if line.strip():
+            names[bits[position]] = line.strip()
+        position += 1
+    return names
+
+
+_INVERT_WORDS = frozenset({"!", "inv", "invert", "інв", "инв"})
+
+
+def split_bit_label(label: str | None) -> tuple[str | None, str | None, bool]:
+    """Split 'Name | device_class | inv' into (name, device class, invert).
+
+    Every part after the name is optional and may come in any order.
+    """
+    if not label:
+        return None, None, False
+    name, *extras = (part.strip() for part in label.split("|"))
+    device_class: str | None = None
+    invert = False
+    for extra in extras:
+        if extra.lower() in _INVERT_WORDS:
+            invert = True
+        elif extra:
+            device_class = extra.lower()
+    return name or None, device_class, invert
+
+
+def bit_group_members(point: Mapping[str, Any]) -> list[tuple[int, str | None]]:
+    """(bit, name or None) for every binary sensor of a bit group.
+
+    Raises ``ValueError`` for an invalid bit list or names.
+    """
+    bits = parse_bits(point.get(CONF_BITS), bit_group_width(point))
+    names = parse_bit_names(point.get(CONF_BIT_NAMES), bits)
+    return [(bit, names.get(bit)) for bit in bits]
+
+
 def build_target(
     point: Mapping[str, Any], address_base: int = 0
 ) -> tuple[Any, str | None]:
@@ -128,6 +227,24 @@ def build_target(
         raise ValueError(f"unknown register type {register_type!r}")
     if writable and register_type == REG_INPUT:
         raise ValueError("input registers are read-only")
+
+    if platform == PLATFORM_BIT_GROUP:
+        # The whole register as an unsigned integer; entities pick their bit.
+        data_type = point.get(CONF_DATA_TYPE, DT_UINT16)
+        if data_type not in BIT_GROUP_WIDTH:
+            raise ValueError(f"a bit group needs uint16/32/64, not {data_type!r}")
+        bit_group_members(point)  # validates the bit list and names
+        cls = _ByteSwappedNumberField if point.get(CONF_BYTE_SWAP) else NumberField
+        return (
+            cls(
+                address,
+                count=BIT_GROUP_WIDTH[data_type] // 16,
+                signed=False,
+                word_order=point.get(CONF_WORD_ORDER, "big"),
+                writable=False,
+            ),
+            register_type,
+        )
 
     bit = point.get(CONF_BIT)
     if bit is not None and platform in ("binary_sensor", "switch"):

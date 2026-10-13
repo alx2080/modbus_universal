@@ -66,6 +66,8 @@ from .const import (
     CONF_ADDRESS_BASE,
     CONF_BAUDRATE,
     CONF_BIT,
+    CONF_BIT_NAMES,
+    CONF_BITS,
     CONF_BYTE_SWAP,
     CONF_BYTESIZE,
     CONF_CONNECTION_TYPE,
@@ -115,7 +117,10 @@ from .const import (
     DT_INT16,
     DT_STRING,
     DT_UINT16,
+    DT_UINT32,
+    BIT_GROUP_DATA_TYPES,
     INTEGER_16_DATA_TYPES,
+    PLATFORM_BIT_GROUP,
     NUMERIC_DATA_TYPES,
     REG_COIL,
     REG_DISCRETE,
@@ -127,7 +132,12 @@ from .const import (
     TYPE_TCP,
     TYPE_UDP,
 )
-from .device import async_read_point, build_target
+from .device import (
+    async_read_point,
+    bit_group_members,
+    build_target,
+    split_bit_label,
+)
 from .helpers import (
     CONF_DEVICE,
     CONF_HOST,
@@ -144,7 +154,7 @@ CONF_STATE_CLASS = "state_class"
 CONF_UNIT_OF_MEASUREMENT = "unit_of_measurement"
 CONF_MODE = "mode"
 
-PLATFORMS = ("sensor", "binary_sensor", "switch", "number", "select")
+PLATFORMS = ("sensor", "binary_sensor", "bit_group", "switch", "number", "select")
 
 COMMON_UNITS = [
     "°C", "°F", "%", "V", "mV", "A", "mA", "W", "kW", "VA", "var", "Wh", "kWh",
@@ -578,6 +588,24 @@ def register_schema(platform: str, d: Mapping[str, Any]) -> vol.Schema:
         bit()
         f[vol.Required(CONF_INVERT, default=d.get(CONF_INVERT, False))] = BooleanSelector()
         device_class([c.value for c in BinarySensorDeviceClass])
+    elif platform == PLATFORM_BIT_GROUP:
+        reg_type([REG_HOLDING, REG_INPUT], REG_HOLDING)
+        address()
+        f[vol.Required(CONF_DATA_TYPE, default=d.get(CONF_DATA_TYPE, DT_UINT32))] = (
+            _select(list(BIT_GROUP_DATA_TYPES), "data_type")
+        )
+        f[vol.Required(CONF_WORD_ORDER, default=d.get(CONF_WORD_ORDER, "big"))] = _select(
+            ["big", "little"], "word_order"
+        )
+        f[vol.Required(CONF_BYTE_SWAP, default=d.get(CONF_BYTE_SWAP, False))] = (
+            BooleanSelector()
+        )
+        f[vol.Optional(CONF_BITS, description=_suggested(d, CONF_BITS))] = TextSelector()
+        f[vol.Optional(CONF_BIT_NAMES, description=_suggested(d, CONF_BIT_NAMES))] = (
+            TextSelector(TextSelectorConfig(multiline=True))
+        )
+        f[vol.Required(CONF_INVERT, default=d.get(CONF_INVERT, False))] = BooleanSelector()
+        device_class([c.value for c in BinarySensorDeviceClass])
     elif platform == "switch":
         reg_type([REG_COIL, REG_HOLDING], REG_COIL)
         address()
@@ -623,12 +651,36 @@ def register_schema(platform: str, d: Mapping[str, Any]) -> vol.Schema:
     return vol.Schema(f)
 
 
+def _describe_bits(data: Mapping[str, Any], value: Any) -> str:
+    """The raw value and the state of each bit, for the test-read step."""
+    if value is None:
+        return "None"
+    raw = int(value)
+    lines = [f"0x{raw:X} ({raw})", ""]
+    for bit, name in bit_group_members(data):
+        label, device_class, invert = split_bit_label(name)
+        on = bool((raw >> bit) & 1) != (invert != bool(data.get(CONF_INVERT)))
+        state = "ON" if on else "OFF"
+        extra = f" [{device_class}]" if device_class else ""
+        lines.append(f"- {bit}: {state}" + (f" — {label}" if label else "") + extra)
+    return "\n".join(lines)
+
+
 def validate_register(platform: str, data: dict[str, Any]) -> str | None:
     """Return an error key, or ``None`` when the description is consistent."""
     register_type = data.get(CONF_REGISTER_TYPE, REG_HOLDING)
     if platform == "binary_sensor" and register_type in (REG_HOLDING, REG_INPUT):
         if data.get(CONF_BIT) is None:
             return "bit_required"
+    if platform == PLATFORM_BIT_GROUP:
+        try:
+            members = bit_group_members(data)
+        except ValueError:
+            return "invalid_bits"
+        classes = {c.value for c in BinarySensorDeviceClass}
+        for _, label in members:
+            if (device_class := split_bit_label(label)[1]) and device_class not in classes:
+                return "invalid_bit_class"
     if data.get(CONF_DATA_TYPE) == DT_STRING and not data.get(CONF_LENGTH):
         return "length_required"
     if platform == "number" and data[CONF_MIN] >= data[CONF_MAX]:
@@ -669,6 +721,9 @@ class RegisterSubentryFlow(ConfigSubentryFlow):
     async def async_step_binary_sensor(self, user_input=None) -> SubentryFlowResult:
         return await self._async_register_step("binary_sensor", user_input)
 
+    async def async_step_bit_group(self, user_input=None) -> SubentryFlowResult:
+        return await self._async_register_step(PLATFORM_BIT_GROUP, user_input)
+
     async def async_step_switch(self, user_input=None) -> SubentryFlowResult:
         return await self._async_register_step("switch", user_input)
 
@@ -703,9 +758,15 @@ class RegisterSubentryFlow(ConfigSubentryFlow):
             elif test_read:
                 value, error, text = await self._async_test_read(data)
                 if error is None:
+                    if platform == PLATFORM_BIT_GROUP:
+                        value = _describe_bits(data, value)
                     self._pending = (name, data)
                     return self.async_show_form(
-                        step_id="test_result",
+                        step_id=(
+                            "bit_test_result"
+                            if platform == PLATFORM_BIT_GROUP
+                            else "test_result"
+                        ),
                         data_schema=vol.Schema({}),
                         description_placeholders={"name": name, "value": str(value)},
                     )
@@ -727,6 +788,10 @@ class RegisterSubentryFlow(ConfigSubentryFlow):
         name, data = self._pending
         return self._async_save(name, data)
 
+    async def async_step_bit_test_result(self, user_input=None) -> SubentryFlowResult:
+        """The bits looked right: save the bit group."""
+        return await self.async_step_test_result(user_input)
+
     async def _async_test_read(self, data: dict[str, Any]) -> tuple[Any, str | None, str]:
         entry = self._get_entry()
         if entry.state is not ConfigEntryState.LOADED:
@@ -746,6 +811,10 @@ class RegisterSubentryFlow(ConfigSubentryFlow):
     @callback
     def _async_save(self, name: str, data: dict[str, Any]) -> SubentryFlowResult:
         title = name or f"{data[CONF_PLATFORM]} {data.get(CONF_ADDRESS)}"
+        if data[CONF_PLATFORM] == PLATFORM_BIT_GROUP:
+            # Optional text fields left empty must not keep their old value.
+            data.setdefault(CONF_BITS, "")
+            data.setdefault(CONF_BIT_NAMES, "")
         if self.source == SOURCE_RECONFIGURE:
             return self.async_update_and_abort(
                 self._get_entry(),

@@ -16,15 +16,24 @@ from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 from homeassistant.helpers.event import async_track_time_interval
 
-from .const import CONF_INVERT, CONF_LINK_TIMEOUT, DEFAULT_LINK_TIMEOUT
+from .const import (
+    CONF_INVERT,
+    CONF_LINK_TIMEOUT,
+    CONF_PLATFORM,
+    DEFAULT_LINK_TIMEOUT,
+    PLATFORM_BIT_GROUP,
+    SUBENTRY_REGISTER,
+)
 from .coordinator import (
     ModbusUniversalConfigEntry,
     ModbusUniversalCoordinator,
     ModbusUniversalRuntimeData,
 )
+from .device import bit_group_members, split_bit_label
 from .entity import ModbusUniversalEntity, async_setup_platform_entities
 
 CONF_DEVICE_CLASS = "device_class"
+BINARY_DEVICE_CLASSES = frozenset(c.value for c in BinarySensorDeviceClass)
 
 
 async def async_setup_entry(
@@ -38,6 +47,23 @@ async def async_setup_entry(
     async_setup_platform_entities(
         hass, entry, async_add_entities, "binary_sensor", ModbusUniversalBinarySensor
     )
+    # A bit group is one register read, shown as one binary sensor per bit.
+    runtime = entry.runtime_data
+    for subentry_id, subentry in entry.subentries.items():
+        if (
+            subentry.subentry_type != SUBENTRY_REGISTER
+            or subentry.data.get(CONF_PLATFORM) != PLATFORM_BIT_GROUP
+        ):
+            continue
+        try:
+            members = bit_group_members(subentry.data)
+        except ValueError:
+            continue  # reported at setup as a misconfigured register
+        coordinator = runtime.coordinator_for(subentry_id)
+        async_add_entities(
+            ModbusUniversalBitSensor(coordinator, subentry, bit, name)
+            for bit, name in members
+        )
 
 
 class ModbusUniversalBinarySensor(ModbusUniversalEntity, BinarySensorEntity):
@@ -57,6 +83,43 @@ class ModbusUniversalBinarySensor(ModbusUniversalEntity, BinarySensorEntity):
         if value is None:
             return None
         return bool(value) != self._invert
+
+
+class ModbusUniversalBitSensor(ModbusUniversalBinarySensor):
+    """One bit of a bit group register."""
+
+    def __init__(
+        self,
+        coordinator: ModbusUniversalCoordinator,
+        subentry: ConfigSubentry,
+        bit: int,
+        name: str | None,
+    ) -> None:
+        super().__init__(coordinator, subentry)
+        self._bit = bit
+        name, device_class, invert = split_bit_label(name)
+        self._attr_name = name or f"{subentry.title} {bit}"
+        if device_class in BINARY_DEVICE_CLASSES:
+            # A class given for this bit overrides the class of the group.
+            self._attr_device_class = BinarySensorDeviceClass(device_class)
+        # "inv" on a bit flips it relative to the group setting.
+        self._invert = self._invert != invert
+        self._attr_unique_id = bit_unique_id(
+            coordinator.config_entry.entry_id, subentry.subentry_id, bit
+        )
+        self._attr_extra_state_attributes = {"bit": bit}
+
+    @property
+    def is_on(self) -> bool | None:
+        value = self.raw_value
+        if value is None:
+            return None
+        return bool((int(value) >> self._bit) & 1) != self._invert
+
+
+def bit_unique_id(entry_id: str, subentry_id: str, bit: int) -> str:
+    """Unique id of one bit sensor of a bit group."""
+    return f"{entry_id}_{subentry_id}_bit{bit}"
 
 
 class ModbusUniversalLinkSensor(BinarySensorEntity):

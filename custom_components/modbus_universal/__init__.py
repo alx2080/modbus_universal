@@ -13,6 +13,8 @@ from .connection import get_unit
 from .const import (
     CONF_ADDRESS_BASE,
     CONF_MAX_GAP,
+    CONF_PLATFORM,
+    PLATFORM_BIT_GROUP,
     CONF_MESSAGE_SPACING,
     CONF_FAST_POLL,
     CONF_FAST_SCAN_INTERVAL,
@@ -32,7 +34,7 @@ from .coordinator import (
     ModbusUniversalCoordinator,
     ModbusUniversalRuntimeData,
 )
-from .device import ModbusUniversalDevice
+from .device import ModbusUniversalDevice, bit_group_members
 from .helpers import build_params
 from .registry import async_prepare_registries
 
@@ -119,8 +121,7 @@ async def async_setup_entry(
         hass,
         entry,
         normal.device_info,
-        [f"{entry.entry_id}_{key}" for key in entry.subentries]
-        + [f"{entry.entry_id}_link"],
+        _unique_ids(entry),
     )
     await normal.async_config_entry_first_refresh()
     if fast is not None:
@@ -132,6 +133,21 @@ async def async_setup_entry(
     # rebuilds the read plan.
     entry.async_on_unload(entry.add_update_listener(_async_update_listener))
     return True
+
+
+def _unique_ids(entry: ModbusUniversalConfigEntry) -> list[str]:
+    """Unique ids of every entity this entry should have (others are removed)."""
+    ids = [f"{entry.entry_id}_link"]
+    for key, subentry in entry.subentries.items():
+        if subentry.data.get(CONF_PLATFORM) != PLATFORM_BIT_GROUP:
+            ids.append(f"{entry.entry_id}_{key}")
+            continue
+        try:
+            members = bit_group_members(subentry.data)
+        except ValueError:
+            continue
+        ids.extend(f"{entry.entry_id}_{key}_bit{bit}" for bit, _ in members)
+    return ids
 
 
 async def _async_update_listener(
