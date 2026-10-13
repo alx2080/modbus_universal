@@ -129,7 +129,6 @@
   },
   "config_subentries": {
     "register": {
-      "title": "Register",
       "entry_type": "Register",
       "initiate_flow": {
         "user": "Add register",
@@ -307,9 +306,9 @@
     },
     "parity": {
       "options": {
-        "N": "None",
-        "E": "Even",
-        "O": "Odd"
+        "n": "None",
+        "e": "Even",
+        "o": "Odd"
       }
     },
     "framer": {

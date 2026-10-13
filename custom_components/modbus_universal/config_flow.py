@@ -250,9 +250,10 @@ def connection_schema(kind: str, d: Mapping[str, Any], *, reconfigure: bool) -> 
         fields[vol.Required(CONF_BYTESIZE, default=str(d.get(CONF_BYTESIZE, 8)))] = vol.All(
             _select(["7", "8"]), vol.Coerce(int)
         )
-        fields[vol.Required(CONF_PARITY, default=d.get(CONF_PARITY, "N"))] = _select(
-            ["N", "E", "O"], "parity"
-        )
+        # Translation keys must be lower case; the entry stores "N"/"E"/"O".
+        fields[
+            vol.Required(CONF_PARITY, default=str(d.get(CONF_PARITY, "N")).lower())
+        ] = _select(["n", "e", "o"], "parity")
         fields[vol.Required(CONF_STOPBITS, default=str(d.get(CONF_STOPBITS, 1)))] = vol.All(
             _select(["1", "2"]), vol.Coerce(int)
         )
@@ -362,6 +363,8 @@ class ModbusUniversalConfigFlow(ConfigFlow, domain=DOMAIN):
             }
             name = user_input.pop(CONF_NAME, None)
             data = {CONF_CONNECTION_TYPE: kind, **user_input}
+            if CONF_PARITY in data:
+                data[CONF_PARITY] = str(data[CONF_PARITY]).upper()
             try:
                 params = build_params(data)
             except ValueError:

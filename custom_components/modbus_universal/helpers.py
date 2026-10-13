@@ -62,7 +62,7 @@ def build_params(data: Mapping[str, Any]) -> ModbusParams:
             device=data[CONF_DEVICE],
             baudrate=int(data.get(CONF_BAUDRATE, DEFAULT_BAUDRATE)),
             bytesize=int(data.get(CONF_BYTESIZE, 8)),
-            parity=data.get(CONF_PARITY, "N"),
+            parity=str(data.get(CONF_PARITY, "N")).upper(),
             stopbits=int(data.get(CONF_STOPBITS, 1)),
             framer=data.get(CONF_FRAMER, "rtu"),
         )
