@@ -302,7 +302,9 @@
         "not_loaded": "Устройство сейчас не запущено, проверочное чтение невозможно. Сохраните без проверки или сначала исправьте подключение.",
         "read_failed": "Ошибка чтения: {error}",
         "invalid_bits": "Неверный список битов или названий: номер бита вне регистра, ошибка в записи «0-7, 12» или названий больше, чем битов.",
-        "invalid_bit_class": "Неизвестный класс устройства в названиях битов. Допустимы, например: problem, door, window, running, power, safety, moisture, smoke, lock, opening, motion."
+        "invalid_bit_class": "Неизвестный класс устройства в названиях битов. Допустимы, например: problem, door, window, running, power, safety, moisture, smoke, lock, opening, motion.",
+        "unit_not_for_class": "Единица не подходит к классу устройства. Для этого класса Home Assistant принимает: {allowed}. Выберите подходящую единицу или другой класс (для об/мин класс оставьте пустым).",
+        "state_class_not_for_class": "Класс состояния не подходит к классу устройства. Допустимо: {allowed}. Например, энергия (kWh) — total_increasing, мощность (kW) — measurement."
       },
       "abort": {
         "reconfigure_successful": "Регистр обновлён."

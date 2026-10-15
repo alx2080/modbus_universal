@@ -302,7 +302,9 @@
         "not_loaded": "Пристрій зараз не запущено, перевірочне читання неможливе. Збережіть без перевірки або спочатку виправте підключення.",
         "read_failed": "Помилка читання: {error}",
         "invalid_bits": "Невірний список бітів або назв: номер біта поза регістром, помилка в записі «0-7, 12» або назв більше, ніж бітів.",
-        "invalid_bit_class": "Невідомий клас пристрою в назвах бітів. Допустимі, наприклад: problem, door, window, running, power, safety, moisture, smoke, lock, opening, motion."
+        "invalid_bit_class": "Невідомий клас пристрою в назвах бітів. Допустимі, наприклад: problem, door, window, running, power, safety, moisture, smoke, lock, opening, motion.",
+        "unit_not_for_class": "Одиниця не підходить до класу пристрою. Для цього класу Home Assistant приймає: {allowed}. Оберіть відповідну одиницю або інший клас (для об/хв клас залиште порожнім).",
+        "state_class_not_for_class": "Клас стану не підходить до класу пристрою. Допустимо: {allowed}. Наприклад, енергія (kWh) — total_increasing, потужність (kW) — measurement."
       },
       "abort": {
         "reconfigure_successful": "Регістр оновлено."

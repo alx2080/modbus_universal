@@ -2,7 +2,14 @@
 
 from __future__ import annotations
 
-from homeassistant.components.number import NumberDeviceClass, NumberEntity, NumberMode
+import logging
+
+from homeassistant.components.number import (
+    DEVICE_CLASS_UNITS,
+    NumberDeviceClass,
+    NumberEntity,
+    NumberMode,
+)
 from homeassistant.config_entries import ConfigSubentry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
@@ -10,6 +17,8 @@ from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 from .const import CONF_MAX, CONF_MIN, CONF_STEP
 from .coordinator import ModbusUniversalConfigEntry, ModbusUniversalCoordinator
 from .entity import ModbusUniversalEntity, async_setup_platform_entities
+
+_LOGGER = logging.getLogger(__name__)
 
 CONF_DEVICE_CLASS = "device_class"
 CONF_MODE = "mode"
@@ -43,7 +52,18 @@ class ModbusUniversalNumber(ModbusUniversalEntity, NumberEntity):
             point.get(CONF_UNIT_OF_MEASUREMENT) or None
         )
         if device_class := point.get(CONF_DEVICE_CLASS):
-            self._attr_device_class = NumberDeviceClass(device_class)
+            device_class = NumberDeviceClass(device_class)
+            allowed = DEVICE_CLASS_UNITS.get(device_class)
+            if allowed is not None and self._attr_native_unit_of_measurement not in allowed:
+                _LOGGER.warning(
+                    "%s: unit %s does not fit device class %s; the class is ignored. "
+                    "Edit the register to pick a matching class or unit",
+                    subentry.title,
+                    self._attr_native_unit_of_measurement,
+                    device_class.value,
+                )
+            else:
+                self._attr_device_class = device_class
 
     @property
     def native_value(self) -> float | None:

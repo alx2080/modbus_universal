@@ -302,7 +302,9 @@
         "not_loaded": "The device is not running, so the register cannot be test-read. Save without the test or fix the connection first.",
         "read_failed": "Reading failed: {error}",
         "invalid_bits": "Invalid bit list or names: a bit outside the register, a typo in \"0-7, 12\", or more names than bits.",
-        "invalid_bit_class": "Unknown device class in the bit names. Valid ones include: problem, door, window, running, power, safety, moisture, smoke, lock, opening, motion."
+        "invalid_bit_class": "Unknown device class in the bit names. Valid ones include: problem, door, window, running, power, safety, moisture, smoke, lock, opening, motion.",
+        "unit_not_for_class": "The unit does not fit the device class. For this class Home Assistant accepts: {allowed}. Pick a matching unit or another class (leave the class empty for rpm).",
+        "state_class_not_for_class": "The state class does not fit the device class. Allowed: {allowed}. For example energy (kWh) — total_increasing, power (kW) — measurement."
       },
       "abort": {
         "reconfigure_successful": "Register updated."
