@@ -1,96 +1,56 @@
 # Modbus Universal
 
-*Home Assistant integration for any Modbus device, registers configured in the UI. UI in English, Ukrainian and Russian; documentation in Russian.*
+**English** | [Українська](README.uk.md)
 
-Кастомная интеграция Home Assistant для **любых** Modbus-устройств. Подключение
-и все регистры настраиваются в браузере, без YAML. Под капотом — новая
-инфраструктура Home Assistant: общие соединения интеграции `modbus`
-(`async_get_unit`) и библиотека
-[`modbus-connection`](https://home-assistant-libs.github.io/modbus-connection/)
-(`ManualComponent` — раскладка регистров, известная только во время работы).
+A Home Assistant custom integration for **any** Modbus device. The connection and all registers are set up in the browser, without YAML. Under the hood it uses the new Home Assistant infrastructure: shared connections of the `modbus` integration (`async_get_unit`) and the [`modbus-connection`](https://home-assistant-libs.github.io/modbus-connection/) library (`ManualComponent` — a register layout known only at run time).
 
-## Возможности
+## Features
 
-- **Подключения:** Modbus TCP, RTU over TCP (прозрачные конвертеры RS485 →
-  Ethernet/Wi-Fi), последовательный порт RTU/ASCII, Modbus UDP.
-- **Одно устройство = одна запись** («Настройки → Устройства и службы →
-  Добавить интеграцию → Modbus Universal»). Несколько устройств на одной шине
-  RS485 или за одним шлюзом автоматически делят одно соединение — запросы
-  выстраиваются в очередь, а не конкурируют.
-- **Каждый регистр = подзапись** с кнопкой «+ Добавить регистр» на карточке
-  устройства. Регистр можно изменить или удалить там же — сущность
-  создаётся/удаляется вместе с ним.
-- **Типы сущностей:** сенсор, бинарный сенсор, группа битов (один регистр —
-  несколько бинарных сенсоров), выключатель, число (уставки), выбор
-  (значение ↔ режим).
-- **Типы данных:** int16/uint16/int32/uint32/int64/uint64/float32/float64,
-  строки; порядок слов (ABCD/CDAB), перестановка байтов, множитель,
-  смещение, отдельные биты регистра (чтение и запись бита без порчи
-  остальных), coil и дискретные входы, принудительная запись функцией 16.
-- **Быстрый опрос отдельных регистров:** переключатель «Быстрый опрос» у
-  регистра + «Быстрый интервал опроса» в параметрах устройства (например,
-  0.2 с = 5 раз в секунду). Остальные регистры читаются с обычным интервалом;
-  оба опроса идут через одно соединение и не мешают друг другу.
-- **Статус связи:** у каждого устройства есть бинарный сенсор «Связь»
-  (connectivity). Если дольше «Потеря связи через» секунд не было ни одного
-  успешного чтения, он переходит в «Отключено». Атрибут `last_seen` — время
-  последнего ответа устройства. Сам сенсор не становится недоступным, поэтому
-  на него удобно вешать автоматизации.
-- **Проверочное чтение** при добавлении регистра: перед сохранением
-  показывается текущее значение.
-- **Копирование карты регистров** с другого устройства (Параметры →
-  «Скопировать регистры…») — второе такое же устройство настраивается за минуту.
-- **Групповое чтение:** соседние регистры читаются одним запросом. Если
-  устройство отвергает групповой запрос (обычно из-за одного неверного
-  адреса), интеграция переходит на поштучное чтение — недоступным становится
-  только проблемный регистр.
-- Нумерация регистров с 0 или с 1, интервал опроса, таймаут, пауза между
-  запросами, автоматическое переподключение, диагностика с сырыми значениями.
+- **Connections:** Modbus TCP, RTU over TCP (transparent RS485 → Ethernet/Wi-Fi converters), serial port RTU/ASCII, Modbus UDP.
+- **One device = one entry** (Settings → Devices & services → Add integration → Modbus Universal). Several devices on one RS485 bus or behind one gateway share one connection automatically: requests queue up instead of competing.
+- **Each register = a subentry**, added with **+ Add register** on the device card. A register can be edited or deleted there as well; its entity is created and deleted with it.
+- **Entity types:** sensor, binary sensor, bit group (one register — several binary sensors), switch, number (setpoints), select (value ↔ mode).
+- **Data types:** int16/uint16/int32/uint32/int64/uint64/float32/float64, strings; word order (ABCD/CDAB), byte swap, scale, offset, single bits of a register (reading and writing a bit without spoiling the others), coils and discrete inputs, forced writing with function 16.
+- **Fast polling of individual registers:** the "Fast polling" switch of a register plus "Fast scan interval" in the device options (for example 0.2 s = 5 times per second). The other registers are read at the normal interval; both polls use one connection and do not disturb each other.
+- **Link status:** each device has a "Connection" binary sensor (connectivity). If there was no successful read for longer than "Connection lost after" seconds, it switches to "Disconnected". The `last_seen` attribute holds the time of the device's last answer. The sensor itself never becomes unavailable, which makes it handy for automations.
+- **Test read** when adding a register: the current value is shown before saving.
+- **Copying the register map** from another device (Options → "Copy registers from another device"): a second identical device is set up in a minute.
+- **Group reads:** neighbouring registers are read with one request. If the device refuses the group request (usually because of one wrong address), the integration switches to reading one by one, so only the faulty register becomes unavailable.
+- Register numbering from 0 or from 1, polling interval, timeout, pause between requests, automatic reconnection, diagnostics with raw values.
 
-## Установка через HACS
+## Installation with HACS
 
-1. HACS → «⋮» (справа вверху) → **Custom repositories**.
+1. HACS → ⋮ (top right) → **Custom repositories**.
 2. Repository: `https://github.com/alx2080/modbus_universal`, Type: **Integration** → **Add**.
-3. Найдите интеграцию в HACS → **Download** → перезапустите Home Assistant.
+3. Find the integration in HACS → **Download** → restart Home Assistant.
 
-Новые версии HACS покажет сам, как обычное обновление.
+HACS offers new versions as ordinary updates.
 
-## Установка вручную
+## Manual installation
 
-1. Скопируйте папку `custom_components/modbus_universal` в
-   `config/custom_components/` (или добавьте репозиторий в HACS как
-   пользовательский).
-2. Перезапустите Home Assistant.
-3. «Настройки → Устройства и службы → Добавить интеграцию → Modbus Universal».
+1. Copy the folder `custom_components/modbus_universal` to `config/custom_components/` (or add the repository to HACS as a custom one).
+2. Restart Home Assistant.
+3. Settings → Devices & services → Add integration → Modbus Universal.
 
-Поддерживаемые версии: Home Assistant 2025.8+ (нужны подзаписи). Общие
-соединения через `async_get_unit` используются, если они есть в вашей версии
-HA; на более старых интеграция открывает собственное соединение.
+Supported versions: Home Assistant 2025.8+ (subentries are needed). Shared connections through `async_get_unit` are used if your Home Assistant version has them; on older versions the integration opens its own connection.
 
-## Как пользоваться
+## Usage
 
-1. Добавьте устройство: тип подключения → адрес/порт → Unit ID. Поле
-   «Адрес проверочного регистра» можно указать, чтобы проверить связь.
-2. На странице интеграции у устройства нажмите **«+ Добавить регистр»**,
-   выберите тип сущности и заполните адрес, тип данных, масштаб и т. д.
-   Включите «Прочитать регистр перед сохранением», чтобы сразу увидеть значение.
-3. Чтобы изменить регистр — «⋮ → Изменить регистр»; удалить — «⋮ → Удалить».
+1. Add a device: connection type → address/port → Unit ID. Fill in "Test register address" if you want the connection to be checked.
+2. On the integration page press **+ Add register** at the device, choose the entity type and fill in the address, data type, scale and so on. Turn on "Read the register before saving" to see the value right away.
+3. To edit a register use ⋮ → Edit register; to delete it use ⋮ → Delete.
 
-Примеры:
+Examples:
 
-| Что | Тип сущности | Настройки |
+| What | Entity type | Settings |
 | --- | --- | --- |
-| Температура 215 = 21,5 °C | Сенсор | holding, int16, множитель 0.1, °C |
-| Счётчик энергии, Wh | Сенсор | input, uint32, порядок CDAB при необходимости, state class `total_increasing` |
-| Авария = бит 3 регистра 40 | Бинарный сенсор | holding, адрес 40, бит 3 |
-| Реле | Выключатель | coil |
-| Режим 0/1/2 | Выбор | holding, `0=Выкл`, `1=Авто`, `2=Нагрев` |
+| Temperature 215 = 21.5 °C | Sensor | holding, int16, scale 0.1, °C |
+| Energy meter, Wh | Sensor | input, uint32, CDAB order if needed, state class `total_increasing` |
+| Alarm = bit 3 of register 40 | Binary sensor | holding, address 40, bit 3 |
+| Relay | Switch | coil |
+| Mode 0/1/2 | Select | holding, `0=Off`, `1=Auto`, `2=Heat` |
 
-## Ограничения и замечания
+## Limitations and notes
 
-- Если то же устройство уже настроено в YAML-конфигурации `modbus:`, оно
-  использует отдельное соединение — уберите его из YAML, чтобы не было
-  конкурирующих запросов.
-- Для core-интеграций Home Assistant требует выносить работу с устройством в
-  отдельную библиотеку на PyPI; для кастомной интеграции это не обязательно,
-  поэтому слой устройства лежит в `device.py` (без импортов HA).
+- If the same device is already set up in the YAML configuration `modbus:`, that uses a separate connection. Remove it from YAML to avoid competing requests.
+- Core integrations of Home Assistant must keep device code in a separate PyPI library. This is not required for a custom integration, so the device layer lives in `device.py` (without Home Assistant imports).
